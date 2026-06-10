@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Athlete Analytics - 대한민국 현역 스포츠 스타 100인 분석 시스템</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN (방사형 차트 및 트렌드 분석용) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Lucide Icons (아이콘 라이브러리) -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&display=swap');
+        body {
+            font-family: 'Pretendard', sans-serif;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+    <!-- 상단 네비게이션 바 -->
+    <header class="bg-slate-900 text-white sticky top-0 z-40 shadow-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center space-x-3">
+                    <div class="bg-blue-600 p-2 rounded-lg">
+                        <i data-lucide="activity" class="w-6 h-6 text-white"></i>
+                    </div>
+                    <span class="text-xl font-bold tracking-tight">Athlete<span class="text-blue-400">Analytics</span></span>
+                    <span class="bg-blue-500/20 text-blue-300 text-[11px] font-bold px-2 py-0.5 rounded-md border border-blue-500/30">KOR ACTIVE 100</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span id="totalCountBadge" class="bg-slate-800 text-slate-300 text-xs px-3 py-1.5 rounded-full border border-slate-700 flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        로드된 선수: 102명
+                    </span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- 메인 컨텐츠 영역 -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <!-- 대시보드 인트로 -->
+        <div class="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+                <h1 class="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">대한민국 현역 스타 100인 분석기</h1>
+                <p class="text-sm text-slate-500 mt-1">2026년 현재 코트와 그라운드를 누비는 최정상급 국가대표 축구·농구 선수들의 상세 기량과 데이터 분석을 한눈에 조회하세요.</p>
+            </div>
+        </div>
+
+        <!-- 메인 레이아웃: 좌측 선수 검색 및 기본 프로필, 우측 시각화 및 정밀 피드백 -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+            <!-- 1. 좌측: 선수 검색 명단 & 상세 프로필 (lg:col-span-5) -->
+            <div class="lg:col-span-5 space-y-6">
+
+                <!-- 등록된 선수 목록 카드 -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col h-[520px]">
+                    <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="users" class="w-5 h-5 text-blue-600"></i>
+                            <h2 class="font-bold text-lg text-slate-900">선수 명단 (<span id="filteredCount">102</span>)</h2>
+                        </div>
+                    </div>
+
+                    <!-- 실시간 검색 및 필터 UI -->
+                    <div class="mt-4 space-y-2.5">
+                        <div class="relative">
+                            <input type="text" id="searchKeyword" oninput="handleFilterChange()" placeholder="이름 또는 팀, 포지션 검색..." class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all">
+                            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+                        </div>
+                        
+                        <div class="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-xl">
+                            <button onclick="changeSportFilter('all')" id="filter_all" class="py-1.5 text-xs font-bold rounded-lg bg-white text-slate-800 shadow-sm transition-all">전체</button>
+                            <button onclick="changeSportFilter('축구')" id="filter_soccer" class="py-1.5 text-xs font-semibold text-slate-600 rounded-lg hover:text-slate-800 transition-all">축구</button>
+                            <button onclick="changeSportFilter('농구')" id="filter_basketball" class="py-1.5 text-xs font-semibold text-slate-600 rounded-lg hover:text-slate-800 transition-all">농구</button>
+                        </div>
+                    </div>
+
+                    <!-- 선수 리스트 스크롤 영역 -->
+                    <div id="athleteListContainer" class="flex-grow mt-4 space-y-2 overflow-y-auto pr-1">
+                        <!-- 동적으로 선수 리스트가 렌더링됩니다. -->
+                    </div>
+                </div>
+                
+                <!-- 선수 피지컬 프로필 표시 카드 -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                    <div class="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
+                        <div class="flex items-center gap-2.5">
+                            <i data-lucide="user" class="w-5 h-5 text-blue-600"></i>
+                            <h2 class="font-bold text-lg text-slate-900">피지컬 프로필</h2>
+                        </div>
+                        <span class="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 font-bold border border-blue-100">조회 모드</span>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                            <span class="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider">이름 / 종목</span>
+                            <span id="profileNameSport" class="text-sm font-bold text-slate-800 mt-1 block">-</span>
+                        </div>
+                        <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                            <span class="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider">소속 / 팀</span>
+                            <span id="profileTeam" class="text-sm font-bold text-slate-800 mt-1 block">-</span>
+                        </div>
+                        <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                            <span class="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider">포지션</span>
+                            <span id="profilePosition" class="text-sm font-bold text-slate-800 mt-1 block">-</span>
+                        </div>
+                        <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                            <span class="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider">피지컬 스펙</span>
+                            <span id="profileSpecs" class="text-sm font-bold text-slate-800 mt-1 block">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 핵심 체력/기술 지표 시각화 바 카드 -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                    <div class="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
+                        <div class="flex items-center gap-2.5">
+                            <i data-lucide="sliders" class="w-5 h-5 text-blue-600"></i>
+                            <h2 class="font-bold text-lg text-slate-900">핵심 역량 분포</h2>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4" id="statsContainer">
+                        <!-- 스피드 -->
+                        <div>
+                            <div class="flex justify-between text-xs font-bold text-slate-600 mb-1.5">
+                                <span class="flex items-center gap-1"><i data-lucide="zap" class="w-3.5 h-3.5 text-amber-500"></i> 스피드 (Speed)</span>
+                                <span id="lbl_speed" class="text-slate-800 font-bold">-</span>
+                            </div>
+                            <div class="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                                <div id="bar_speed" class="bg-blue-600 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+                            </div>
+                        </div>
+
+                        <!-- 파워/근력 -->
+                        <div>
+                            <div class="flex justify-between text-xs font-bold text-slate-600 mb-1.5">
+                                <span class="flex items-center gap-1"><i data-lucide="dumbbell" class="w-3.5 h-3.5 text-red-500"></i> 파워/근력 (Power)</span>
+                                <span id="lbl_power" class="text-slate-800 font-bold">-</span>
+                            </div>
+                            <div class="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                                <div id="bar_power" class="bg-blue-600 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+                            </div>
+                        </div>
+
+                        <!-- 심폐지구력 -->
+                        <div>
+                            <div class="flex justify-between text-xs font-bold text-slate-600 mb-1.5">
+                                <span class="flex items-center gap-1"><i data-lucide="heart" class="w-3.5 h-3.5 text-rose-500"></i> 지구력 (Endurance)</span>
+                                <span id="lbl_endurance" class="text-slate-800 font-bold">-</span>
+                            </div>
+                            <div class="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                                <div id="bar_endurance" class="bg-blue-600 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+                            </div>
+                        </div>
+
+                        <!-- 민첩성/순발력 -->
+                        <div>
+                            <div class="flex justify-between text-xs font-bold text-slate-600 mb-1.5">
+                                <span class="flex items-center gap-1"><i data-lucide="wind" class="w-3.5 h-3.5 text-sky-500"></i> 민첩성 (Agility)</span>
+                                <span id="lbl_agility" class="text-slate-800 font-bold">-</span>
+                            </div>
+                            <div class="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                                <div id="bar_agility" class="bg-blue-600 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+                            </div>
+                        </div>
+
+                        <!-- 유연성/협응성 -->
+                        <div>
+                            <div class="flex justify-between text-xs font-bold text-slate-600 mb-1.5">
+                                <span class="flex items-center gap-1"><i data-lucide="sparkles" class="w-3.5 h-3.5 text-emerald-500"></i> 유연성 (Flexibility)</span>
+                                <span id="lbl_flexibility" class="text-slate-800 font-bold">-</span>
+                            </div>
+                            <div class="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                                <div id="bar_flexibility" class="bg-blue-600 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+                            </div>
+                        </div>
+
+                        <!-- 기술/전술이해 -->
+                        <div>
+                            <div class="flex justify-between text-xs font-bold text-slate-600 mb-1.5">
+                                <span class="flex items-center gap-1"><i data-lucide="brain" class="w-3.5 h-3.5 text-violet-500"></i> 기술/전술 (Skill/Tactics)</span>
+                                <span id="lbl_tactics" class="text-slate-800 font-bold">-</span>
+                            </div>
+                            <div class="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                                <div id="bar_tactics" class="bg-blue-600 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- 2. 우측: 데이터 시각화 차트 및 분석 피드백 보고서 (lg:col-span-7) -->
+            <div class="lg:col-span-7 space-y-6">
+                
+                <!-- 분석용 레이아웃 상단: 선수 가상 카드 및 간략 특징 요약 -->
+                <div class="bg-gradient-to-br from-slate-900 via-slate-800 to-blue-950 text-white rounded-2xl p-6 shadow-md relative overflow-hidden">
+                    <div class="absolute right-0 bottom-0 opacity-10 pointer-events-none">
+                        <i data-lucide="award" class="w-48 h-48"></i>
+                    </div>
+                    
+                    <div class="relative z-10 flex flex-col sm:flex-row items-center sm:items-start gap-6">
+                        <div class="w-20 h-20 bg-blue-500/20 rounded-full border-2 border-blue-400 flex items-center justify-center text-blue-300 shrink-0 shadow-inner">
+                            <i data-lucide="user-check" class="w-10 h-10"></i>
+                        </div>
+                        
+                        <div class="text-center sm:text-left flex-grow">
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-center sm:justify-start gap-2">
+                                <span id="out_name" class="text-2xl font-extrabold tracking-tight">-</span>
+                                <span id="out_position" class="bg-blue-600 text-white text-xs font-bold px-2.5 py-1 rounded-full self-center sm:self-auto">-</span>
+                            </div>
+                            
+                            <p class="text-sm text-slate-300 mt-1" id="out_team_spec">- · -</p>
+                            
+                            <!-- 피지컬 요약 정보 -->
+                            <div class="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-slate-700 text-xs text-slate-300 text-center sm:text-left">
+                                <div>나이: <span id="out_age" class="font-bold text-white">-</span>세</div>
+                                <div>신장: <span id="out_height" class="font-bold text-white">-</span>cm</div>
+                                <div>체중: <span id="out_weight" class="font-bold text-white">-</span>kg</div>
+                            </div>
+                        </div>
+
+                        <!-- 실시간 종합 분석 스코어 -->
+                        <div class="bg-white/10 backdrop-blur-md rounded-xl p-3 border border-white/10 text-center min-w-[80px]">
+                            <div class="text-[10px] text-slate-300 uppercase tracking-widest font-semibold">종합 능력</div>
+                            <div id="out_overall_score" class="text-3xl font-extrabold text-blue-400 mt-0.5">0</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 시각화 영역: 방사형 및 추이 차트 -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                    <div class="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
+                        <div class="flex items-center gap-2.5">
+                            <i data-lucide="pie-chart" class="w-5 h-5 text-blue-600"></i>
+                            <h2 class="font-bold text-lg text-slate-900">선수 역량 다이어그램 및 트렌드</h2>
+                        </div>
+                        <div class="flex bg-slate-100 p-1 rounded-lg">
+                            <button onclick="toggleChartMode('radar')" id="btn_mode_radar" class="px-3 py-1 text-xs font-bold rounded-md bg-white text-slate-800 shadow-sm transition-all">균형 차트</button>
+                            <button onclick="toggleChartMode('trend')" id="btn_mode_trend" class="px-3 py-1 text-xs font-semibold text-slate-600 rounded-md hover:text-slate-800 transition-all">트렌드</button>
+                        </div>
+                    </div>
+
+                    <!-- 차트가 렌더링될 영역 -->
+                    <div class="relative w-full h-[320px] flex items-center justify-center">
+                        <canvas id="analyticsChart" class="w-full h-full max-h-[300px]"></canvas>
+                    </div>
+                </div>
+
+                <!-- 정밀 피드백 및 강점/단점 데이터 추출 -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                    <div class="flex items-center gap-2.5 pb-4 mb-4 border-b border-slate-100">
+                        <i data-lucide="file-text" class="w-5 h-5 text-blue-600"></i>
+                        <h2 class="font-bold text-lg text-slate-900">선수 정밀 분석 피드백 및 특성</h2>
+                    </div>
+
+                    <div class="space-y-6">
+                        <!-- 강점과 약점 자동 구분 표시 -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <!-- 가장 두드러지는 강점 -->
+                            <div class="bg-emerald-50 border border-emerald-100 rounded-xl p-4">
+                                <div class="flex items-center gap-2 text-emerald-800 font-bold text-sm mb-2">
+                                    <i data-lucide="trending-up" class="w-4 h-4 text-emerald-600"></i>
+                                    <span>핵심 경쟁 우위 (강점)</span>
+                                </div>
+                                <p id="out_strength" class="text-xs text-emerald-700 leading-relaxed font-semibold">
+                                    선택한 선수의 최고 기량 파트를 분석하고 강점 요소를 제안합니다.
+                                </p>
+                            </div>
+
+                            <!-- 개선이 시급한 약점 -->
+                            <div class="bg-amber-50 border border-amber-100 rounded-xl p-4">
+                                <div class="flex items-center gap-2 text-amber-800 font-bold text-sm mb-2">
+                                    <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-600"></i>
+                                    <span>보완이 시급한 지표 (약점)</span>
+                                </div>
+                                <p id="out_weakness" class="text-xs text-amber-700 leading-relaxed font-semibold">
+                                    훈련 및 세션 조율 시 우선적으로 체크해야 할 능력치 피드백입니다.
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- 데이터 기반 자동 추천 분석 보고서 리포트 -->
+                        <div>
+                            <h3 class="text-sm font-bold text-slate-800 mb-2 flex items-center gap-1.5">
+                                <i data-lucide="clipboard-list" class="w-4.5 h-4.5 text-blue-600"></i>
+                                데이터 기반 맞춤형 성장 로드맵
+                            </h3>
+                            <div class="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                                <p id="out_analysis_report" class="text-xs text-slate-600 leading-relaxed">
+                                    선수명단에서 원하는 한국 대표팀 선수를 선택하면 자동으로 역량 곡선과 훈련 관리자 가이드라인이 생성됩니다.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 가이드 영역 -->
+                <div class="bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-start gap-3">
+                    <i data-lucide="info" class="w-5 h-5 text-blue-600 shrink-0 mt-0.5"></i>
+                    <div class="text-xs text-blue-800 leading-relaxed">
+                        <span class="font-bold">선수 조회 및 모니터링 가이드:</span> 
+                        <ul class="list-disc pl-4 mt-1 space-y-1">
+                            <li><strong>안전한 보존:</strong> 명단 카테고리 필터와 실시간 검색어 입력을 편리하게 지원합니다.</li>
+                            <li><strong>최신 2026 현역 라인업:</strong> 그라운드와 코트 위 활약 지수를 반영한 국가대표 전문 DB가 내장되어 안전하게 연동됩니다.</li>
+                        </ul>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+    </main>
+
+    <!-- 하단 푸터 -->
+    <footer class="bg-slate-900 text-slate-400 py-6 border-t border-slate-800 text-center text-xs mt-12">
+        <p class="mb-1">© 2026 AthleteAnalytics. All rights reserved.</p>
+        <p class="text-[10px] text-slate-500">모바일과 PC 화면에 유연하게 대응되는 반응형 분석 플랫폼</p>
+    </footer>
+
+    <!-- 로직 자바스크립트 및 인터랙션 분석 처리 -->
+    <script>
+        // 전역 차트 인스턴스 관리용 변수
+        let chartInstance = null;
+        let currentChartMode = 'radar'; // 'radar' 또는 'trend'
+
+        // 다중 선수 데이터 배열 선언
+        let athletes = [];
+        let selectedAthleteId = null; // 현재 선택된 선수의 고유 ID
+        let currentSportFilter = 'all'; // 'all', '축구', '농구'
+
+        // 100여명 대한민국 순수 현역 국가대표 및 프로선수 데이터베이스 구축 (2026년 기준 활동 중인 선수단)
+        const initialKoreanStars = [
+            // ================= 축구 올스타 (51명 - 전원 현역) =================
+            { id: "soc_son", name: "손흥민", sport: "축구", team: "토트넘 홋스퍼", position: "공격수 (FW)", age: 33, height: 183, weight: 78, stats: { speed: 96, power: 84, endurance: 91, agility: 93, flexibility: 78, tactics: 92 }, trends: [89, 93, 91, 95, 96], trendUnit: "경기 기여 점수" },
+            { id: "soc_kim", name: "김민재", sport: "축구", team: "바이에른 뮌헨", position: "수비수 (DF)", age: 29, height: 190, weight: 88, stats: { speed: 89, power: 96, endurance: 92, agility: 88, flexibility: 82, tactics: 95 }, trends: [91, 92, 94, 95, 93], trendUnit: "수비 차단율" },
+            { id: "soc_lee_k", name: "이강인", sport: "축구", team: "파리 생제르맹", position: "미드필더 (MF)", age: 25, height: 174, weight: 72, stats: { speed: 82, power: 74, endurance: 85, agility: 96, flexibility: 90, tactics: 97 }, trends: [84, 88, 91, 93, 95], trendUnit: "어시스트 지수" },
+            { id: "soc_hwang_h", name: "황희찬", sport: "축구", team: "울버햄튼 원더러스", position: "공격수 (FW)", age: 30, height: 177, weight: 77, stats: { speed: 92, power: 88, endurance: 86, agility: 90, flexibility: 74, tactics: 84 }, trends: [78, 82, 85, 89, 91], trendUnit: "돌파 성공률" },
+            { id: "soc_hwang_i", name: "황인범", sport: "축구", team: "페예노르트", position: "미드필더 (MF)", age: 29, height: 177, weight: 70, stats: { speed: 80, power: 72, endurance: 94, agility: 85, flexibility: 84, tactics: 93 }, trends: [85, 88, 90, 92, 94], trendUnit: "패스 정밀도" },
+            { id: "soc_cho_h", name: "조현우", sport: "축구", team: "울산 HD FC", position: "골키퍼 (GK)", age: 34, height: 189, weight: 76, stats: { speed: 70, power: 78, endurance: 82, agility: 95, flexibility: 92, tactics: 90 }, trends: [88, 90, 89, 93, 96], trendUnit: "선방률 지수" },
+            { id: "soc_lee_j", name: "이재성", sport: "축구", team: "마인츠 05", position: "미드필더 (MF)", age: 33, height: 180, weight: 70, stats: { speed: 82, power: 70, endurance: 92, agility: 86, flexibility: 85, tactics: 94 }, trends: [84, 87, 89, 91, 92], trendUnit: "전술 이해도" },
+            { id: "soc_seol", name: "설영우", sport: "축구", team: "츠르베나 즈베즈다", position: "수비수 (DF)", age: 27, height: 180, weight: 75, stats: { speed: 86, power: 78, endurance: 91, agility: 84, flexibility: 80, tactics: 87 }, trends: [80, 83, 85, 88, 90], trendUnit: "풀백 기여도" },
+            { id: "soc_bae", name: "배준호", sport: "축구", team: "스토크 시티", position: "미드필더 (MF)", age: 22, height: 178, weight: 71, stats: { speed: 85, power: 70, endurance: 83, agility: 91, flexibility: 88, tactics: 89 }, trends: [75, 80, 84, 87, 91], trendUnit: "공격 창의성" },
+            { id: "soc_yang", name: "양민혁", sport: "축구", team: "토트넘 홋스퍼", position: "공격수 (FW)", age: 20, height: 175, weight: 68, stats: { speed: 91, power: 68, endurance: 82, agility: 92, flexibility: 84, tactics: 83 }, trends: [72, 79, 83, 86, 90], trendUnit: "기대 성장치" },
+            { id: "soc_cho_g", name: "조규성", sport: "축구", team: "미트윌란", position: "공격수 (FW)", age: 28, height: 188, weight: 82, stats: { speed: 80, power: 87, endurance: 88, agility: 81, flexibility: 78, tactics: 85 }, trends: [80, 84, 86, 83, 85], trendUnit: "공중볼 획득" },
+            { id: "soc_oh", name: "오현규", sport: "축구", team: "헹크", position: "공격수 (FW)", age: 25, height: 185, weight: 80, stats: { speed: 83, power: 89, endurance: 84, agility: 82, flexibility: 73, tactics: 80 }, trends: [74, 78, 81, 85, 88], trendUnit: "슈팅 정확도" },
+            { id: "soc_paik", name: "백승호", sport: "축구", team: "버밍엄 시티", position: "미드필더 (MF)", age: 29, height: 180, weight: 74, stats: { speed: 80, power: 79, endurance: 89, agility: 82, flexibility: 81, tactics: 88 }, trends: [82, 85, 87, 88, 90], trendUnit: "패스 줄기 분포" },
+            { id: "soc_eom_j", name: "엄지성", sport: "축구", team: "스완지 시티", position: "공격수 (FW)", age: 24, height: 178, weight: 70, stats: { speed: 88, power: 72, endurance: 84, agility: 91, flexibility: 83, tactics: 85 }, trends: [76, 81, 83, 86, 89], trendUnit: "전방 압박 기여" },
+            { id: "soc_kim_j_s", name: "김지수", sport: "축구", team: "브렌트포드", position: "수비수 (DF)", age: 21, height: 192, weight: 84, stats: { speed: 81, power: 90, endurance: 83, agility: 78, flexibility: 73, tactics: 82 }, trends: [68, 73, 77, 81, 85], trendUnit: "공중볼 차단률" },
+            { id: "soc_seol_o", name: "오세훈", sport: "축구", team: "마치다 젤비아", position: "공격수 (FW)", age: 27, height: 193, weight: 85, stats: { speed: 78, power: 91, endurance: 84, agility: 75, flexibility: 71, tactics: 81 }, trends: [75, 79, 81, 84, 88], trendUnit: "타겟 스트라이커 지수" },
+            { id: "soc_joo", name: "주민규", sport: "축구", team: "울산 HD FC", position: "공격수 (FW)", age: 36, height: 183, weight: 79, stats: { speed: 73, power: 88, endurance: 83, agility: 76, flexibility: 72, tactics: 88 }, trends: [85, 88, 86, 89, 90], trendUnit: "득점 기여도" },
+            { id: "soc_lee_s_w", name: "이승우", sport: "축구", team: "전북 현대 모터스", position: "공격수 (FW)", age: 28, height: 173, weight: 65, stats: { speed: 86, power: 70, endurance: 81, agility: 94, flexibility: 89, tactics: 87 }, trends: [80, 83, 86, 88, 91], trendUnit: "밀집 구역 탈압박" },
+            { id: "soc_song_m", name: "송민규", sport: "축구", team: "전북 현대 모터스", position: "공격수 (FW)", age: 27, height: 179, weight: 72, stats: { speed: 82, power: 78, endurance: 85, agility: 87, flexibility: 80, tactics: 84 }, trends: [80, 83, 85, 87, 89], trendUnit: "박스 진입율" },
+            { id: "soc_park_j_s", name: "박진섭", sport: "축구", team: "전북 현대 모터스", position: "수비수 (DF)", age: 31, height: 184, weight: 80, stats: { speed: 75, power: 85, endurance: 88, agility: 77, flexibility: 74, tactics: 85 }, trends: [82, 84, 85, 86, 88], trendUnit: "공중볼 획득량" },
+            { id: "soc_hwang_j", name: "황재원", sport: "축구", team: "대구 FC", position: "수비수 (DF)", age: 24, height: 180, weight: 74, stats: { speed: 85, power: 73, endurance: 92, agility: 86, flexibility: 82, tactics: 85 }, trends: [78, 81, 85, 87, 90], trendUnit: "풀백 크로싱 성공" },
+            { id: "soc_lee_d_k", name: "이동경", sport: "축구", team: "김천 상무", position: "미드필더 (MF)", age: 29, height: 175, weight: 68, stats: { speed: 81, power: 76, endurance: 84, agility: 86, flexibility: 83, tactics: 89 }, trends: [84, 87, 89, 91, 93], trendUnit: "중거리 슈팅 지수" },
+            { id: "soc_jung_h", name: "정호연", sport: "축구", team: "광주 FC", position: "미드필더 (MF)", age: 26, height: 180, weight: 73, stats: { speed: 82, power: 74, endurance: 91, agility: 85, flexibility: 80, tactics: 88 }, trends: [79, 83, 85, 88, 91], trendUnit: "볼 배급 수치" },
+            { id: "soc_um", name: "엄원상", sport: "축구", team: "울산 HD FC", position: "공격수 (FW)", age: 27, height: 171, weight: 63, stats: { speed: 95, power: 66, endurance: 82, agility: 93, flexibility: 80, tactics: 82 }, trends: [79, 82, 85, 84, 88], trendUnit: "윙어 효율성" },
+            { id: "soc_na", name: "나상호", sport: "축구", team: "마치다 젤비아", position: "공격수 (FW)", age: 30, height: 173, weight: 70, stats: { speed: 87, power: 73, endurance: 85, agility: 89, flexibility: 82, tactics: 83 }, trends: [80, 82, 84, 85, 86], trendUnit: "측면 돌파율" },
+            { id: "soc_kang_s", name: "강성진", sport: "축구", team: "FC 서울", position: "공격수 (FW)", age: 23, height: 178, weight: 74, stats: { speed: 84, power: 72, endurance: 80, agility: 88, flexibility: 83, tactics: 81 }, trends: [72, 75, 78, 82, 85], trendUnit: "슈팅 성공률" },
+            { id: "soc_lee_t_s", name: "이태석", sport: "축구", team: "포항 스틸러스", position: "수비수 (DF)", age: 24, height: 178, weight: 73, stats: { speed: 81, power: 72, endurance: 85, agility: 80, flexibility: 81, tactics: 81 }, trends: [71, 75, 78, 80, 82], trendUnit: "오버래핑 효율" },
+            { id: "soc_kim_j_h", name: "김준홍", sport: "축구", team: "전북 현대 모터스", position: "골키퍼 (GK)", age: 23, height: 190, weight: 87, stats: { speed: 68, power: 80, endurance: 81, agility: 88, flexibility: 86, tactics: 83 }, trends: [72, 75, 78, 82, 84], trendUnit: "공중볼 처리 성공" },
+            { id: "soc_lee_m", name: "이명재", sport: "축구", team: "울산 HD FC", position: "수비수 (DF)", age: 33, height: 182, weight: 74, stats: { speed: 80, power: 76, endurance: 86, agility: 79, flexibility: 78, tactics: 85 }, trends: [81, 83, 85, 86, 88], trendUnit: "크로싱 정밀도" },
+            { id: "soc_choi_j", name: "최준", sport: "축구", team: "FC 서울", position: "수비수 (DF)", age: 27, height: 177, weight: 72, stats: { speed: 87, power: 75, endurance: 93, agility: 85, flexibility: 80, tactics: 84 }, trends: [82, 84, 87, 89, 91], trendUnit: "태클 성공률" },
+            { id: "soc_park_s", name: "박승욱", sport: "축구", team: "김천 상무", position: "수비수 (DF)", age: 29, height: 184, weight: 78, stats: { speed: 78, power: 84, endurance: 88, agility: 80, flexibility: 76, tactics: 83 }, trends: [79, 81, 84, 85, 88], trendUnit: "클리어링 횟수" },
+            { id: "soc_ha_c", name: "하창래", sport: "축구", team: "나고야 그램퍼스", position: "수비수 (DF)", age: 32, height: 188, weight: 82, stats: { speed: 73, power: 89, endurance: 85, agility: 74, flexibility: 71, tactics: 82 }, trends: [78, 80, 83, 85, 87], trendUnit: "가로채기 성공지수" },
+            { id: "soc_lee_g_h", name: "이기혁", sport: "축구", team: "강원 FC", position: "수비수 (DF)", age: 26, height: 184, weight: 78, stats: { speed: 79, power: 78, endurance: 88, agility: 83, flexibility: 84, tactics: 86 }, trends: [77, 81, 84, 86, 89], trendUnit: "공간 빌드업 평점" },
+            { id: "soc_yang_h", name: "양현준", sport: "축구", team: "셀틱 FC", position: "공격수 (FW)", age: 24, height: 175, weight: 72, stats: { speed: 90, power: 71, endurance: 81, agility: 93, flexibility: 86, tactics: 83 }, trends: [73, 76, 80, 82, 85], trendUnit: "박스 드리블 전개" },
+            { id: "soc_won_d", name: "원두재", sport: "축구", team: "코르파칸 클럽", position: "미드필더 (MF)", age: 29, height: 187, weight: 81, stats: { speed: 74, power: 83, endurance: 87, agility: 76, flexibility: 75, tactics: 86 }, trends: [81, 83, 84, 85, 87], trendUnit: "가로채기 빈도" },
+            { id: "soc_kim_d_w", name: "김대원", sport: "축구", team: "김천 상무", position: "공격수 (FW)", age: 29, height: 172, weight: 67, stats: { speed: 85, power: 71, endurance: 86, agility: 90, flexibility: 84, tactics: 86 }, trends: [81, 84, 85, 87, 89], trendUnit: "기회 창출력" },
+            { id: "soc_yoon_d", name: "윤도영", sport: "축구", team: "대전 하나 시티즌", position: "공격수 (FW)", age: 20, height: 173, weight: 65, stats: { speed: 89, power: 65, endurance: 80, agility: 92, flexibility: 86, tactics: 80 }, trends: [70, 74, 78, 83, 87], trendUnit: "성장 기대 지표" },
+            { id: "soc_kang_j", name: "강주혁", sport: "축구", team: "FC 서울", position: "공격수 (FW)", age: 20, height: 175, weight: 68, stats: { speed: 91, power: 67, endurance: 79, agility: 90, flexibility: 82, tactics: 79 }, trends: [68, 73, 77, 81, 85], trendUnit: "전방 침투 위협" },
+            { id: "soc_baek_m", name: "백민규", sport: "축구", team: "인천 유나이티드", position: "공격수 (FW)", age: 21, height: 183, weight: 77, stats: { speed: 88, power: 74, endurance: 81, agility: 85, flexibility: 78, tactics: 80 }, trends: [66, 70, 75, 79, 83], trendUnit: "측면 크로스 점수" },
+            { id: "soc_choi_w", name: "최우진", sport: "축구", team: "인천 유나이티드", position: "수비수 (DF)", age: 22, height: 176, weight: 68, stats: { speed: 84, power: 70, endurance: 87, agility: 86, flexibility: 82, tactics: 82 }, trends: [70, 74, 78, 82, 86], trendUnit: "수비 태클 강도" },
+            { id: "soc_ko_y", name: "고영준", sport: "축구", team: "파르티잔 벨그라드", position: "미드필더 (MF)", age: 25, height: 168, weight: 64, stats: { speed: 86, power: 68, endurance: 83, agility: 92, flexibility: 85, tactics: 85 }, trends: [77, 81, 83, 85, 88], trendUnit: "공격 빌드업 성공률" },
+            { id: "soc_kim_d", name: "김동준", sport: "축구", team: "제주 유나이티드", position: "골키퍼 (GK)", age: 32, height: 189, weight: 85, stats: { speed: 66, power: 82, endurance: 80, agility: 89, flexibility: 87, tactics: 86 }, trends: [82, 84, 86, 87, 89], trendUnit: "박스 안 커버리지" },
+            { id: "soc_jung_t", name: "정태욱", sport: "축구", team: "울산 HD FC", position: "수비수 (DF)", age: 29, height: 194, weight: 92, stats: { speed: 72, power: 92, endurance: 83, agility: 71, flexibility: 70, tactics: 82 }, trends: [78, 80, 82, 84, 85], trendUnit: "헤더 클리어율" },
+            { id: "soc_kim_y", name: "김영권", sport: "축구", team: "울산 HD FC", position: "수비수 (DF)", age: 36, height: 186, weight: 81, stats: { speed: 74, power: 82, endurance: 84, agility: 76, flexibility: 79, tactics: 90 }, trends: [87, 89, 86, 85, 88], trendUnit: "빌드업 공헌" },
+            { id: "soc_ki", name: "기성용", sport: "축구", team: "FC 서울", position: "미드필더 (MF)", age: 37, height: 189, weight: 81, stats: { speed: 73, power: 80, endurance: 85, agility: 75, flexibility: 78, tactics: 95 }, trends: [88, 86, 89, 87, 91], trendUnit: "빌드업 지표" },
+            { id: "soc_lee_c", name: "이청용", sport: "축구", team: "울산 HD FC", position: "미드필더 (MF)", age: 37, height: 180, weight: 70, stats: { speed: 78, power: 68, endurance: 84, agility: 89, flexibility: 85, tactics: 93 }, trends: [86, 88, 87, 90, 89], trendUnit: "테크닉 스코어" },
+            { id: "soc_koo", name: "구자철", sport: "축구", team: "제주 유나이티드", position: "미드필더 (MF)", age: 37, height: 184, weight: 79, stats: { speed: 75, power: 76, endurance: 88, agility: 78, flexibility: 80, tactics: 91 }, trends: [84, 86, 85, 89, 87], trendUnit: "중원 리더십" },
+            { id: "soc_kwon", name: "권창훈", sport: "축구", team: "전북 현대 모터스", position: "미드필더 (MF)", age: 32, height: 174, weight: 70, stats: { speed: 83, power: 74, endurance: 85, agility: 88, flexibility: 83, tactics: 87 }, trends: [82, 80, 78, 83, 85], trendUnit: "풋워크 평점" },
+            { id: "soc_jung_w", name: "정우영 (큰)", sport: "축구", team: "울산 HD FC", position: "미드필더 (MF)", age: 37, height: 186, weight: 78, stats: { speed: 68, power: 83, endurance: 88, agility: 71, flexibility: 72, tactics: 88 }, trends: [82, 84, 81, 83, 85], trendUnit: "롱패스 전개율" },
+            { id: "soc_cho_y", name: "조유민", sport: "축구", team: "샤르자 FC", position: "수비수 (DF)", age: 30, height: 182, weight: 77, stats: { speed: 80, power: 84, endurance: 85, agility: 79, flexibility: 76, tactics: 84 }, trends: [81, 83, 85, 84, 87], trendUnit: "클리어링 횟수" },
+            { id: "soc_hong_h", name: "홍현석", sport: "축구", team: "마인츠 05", position: "미드필더 (MF)", age: 27, height: 177, weight: 71, stats: { speed: 81, power: 70, endurance: 90, agility: 86, flexibility: 84, tactics: 88 }, trends: [82, 85, 87, 86, 90], trendUnit: "기회 창출력" },
+
+            // ================= 농구 올스타 (51명 - 전원 현역) =================
+            { id: "bas_hur_u", name: "허웅", sport: "농구", team: "부산 KCC 이지스", position: "슈팅 가드 (SG)", age: 33, height: 185, weight: 78, stats: { speed: 84, power: 75, endurance: 87, agility: 86, flexibility: 84, tactics: 90 }, trends: [83, 86, 88, 90, 92], trendUnit: "클러치 타임 득점" },
+            { id: "bas_hur_h", name: "허훈", sport: "농구", team: "수원 KT 소닉붐", position: "포인트 가드 (PG)", age: 31, height: 180, weight: 80, stats: { speed: 88, power: 78, endurance: 90, agility: 92, flexibility: 82, tactics: 93 }, trends: [86, 89, 91, 93, 95], trendUnit: "공격 조립 수치" },
+            { id: "bas_lee_d_s", name: "이대성", sport: "농구", team: "서울 삼성 썬더스", position: "포인트 가드 (PG)", age: 36, height: 190, weight: 85, stats: { speed: 83, power: 81, endurance: 91, agility: 84, flexibility: 80, tactics: 88 }, trends: [84, 86, 85, 89, 87], trendUnit: "온볼 압박 지수" },
+            { id: "bas_choi_j", name: "최준용", sport: "농구", team: "부산 KCC 이지스", position: "스몰 포워드 (SF)", age: 32, height: 200, weight: 92, stats: { speed: 85, power: 82, endurance: 88, agility: 86, flexibility: 83, tactics: 91 }, trends: [84, 88, 86, 90, 92], trendUnit: "속공 컨트롤러" },
+            { id: "bas_song", name: "송교창", sport: "농구", team: "부산 KCC 이지스", position: "스몰 포워드 (SF)", age: 30, height: 200, weight: 90, stats: { speed: 86, power: 80, endurance: 89, agility: 85, flexibility: 81, tactics: 87 }, trends: [81, 84, 86, 88, 90], trendUnit: "트랜지션 스코어" },
+            { id: "bas_kim_s_h", name: "김선형", sport: "농구", team: "서울 SK 나이츠", position: "포인트 가드 (PG)", age: 38, height: 187, weight: 78, stats: { speed: 92, power: 70, endurance: 86, agility: 93, flexibility: 84, tactics: 91 }, trends: [88, 91, 87, 89, 90], trendUnit: "플래시 드라이브인" },
+            { id: "bas_oh_s_g", name: "오세근", sport: "농구", team: "서울 SK 나이츠", position: "센터 (C)", age: 39, height: 200, weight: 104, stats: { speed: 68, power: 94, endurance: 85, agility: 73, flexibility: 75, tactics: 95 }, trends: [89, 92, 88, 87, 91], trendUnit: "골밑 풋워크" },
+            { id: "bas_kim_j_s", name: "김종규", sport: "농구", team: "원주 DB 프로미", position: "센터 (C)", age: 35, height: 207, weight: 98, stats: { speed: 78, power: 88, endurance: 84, agility: 79, flexibility: 74, tactics: 86 }, trends: [82, 85, 83, 86, 87], trendUnit: "블록슛 지표" },
+            { id: "bas_kang_s_j", name: "강상재", sport: "농구", team: "원주 DB 프로미", position: "파워 포워드 (PF)", age: 32, height: 200, weight: 96, stats: { speed: 76, power: 86, endurance: 88, agility: 78, flexibility: 77, tactics: 89 }, trends: [83, 86, 88, 90, 92], trendUnit: "컨트롤 타워 기여" },
+            { id: "bas_byeon", name: "변준형", sport: "농구", team: "안양 정관장 레드부스터스", position: "포인트 가드 (PG)", age: 30, height: 185, weight: 84, stats: { speed: 87, power: 82, endurance: 86, agility: 89, flexibility: 81, tactics: 89 }, trends: [82, 85, 88, 90, 92], trendUnit: "스텝백 효율" },
+            { id: "bas_lee_w_y", name: "이우석", sport: "농구", team: "울산 현대모비스 피버스", position: "슈팅 가드 (SG)", age: 27, height: 196, weight: 85, stats: { speed: 86, power: 77, endurance: 85, agility: 86, flexibility: 82, tactics: 84 }, trends: [79, 82, 85, 87, 89], trendUnit: "트랜지션 피니시" },
+            { id: "bas_ha_y_g", name: "하윤기", sport: "농구", team: "수원 KT 소닉붐", position: "센터 (C)", age: 27, height: 204, weight: 98, stats: { speed: 80, power: 90, endurance: 83, agility: 81, flexibility: 75, tactics: 81 }, trends: [77, 82, 84, 86, 89], trendUnit: "골밑 인유어페이스" },
+            { id: "bas_moon_s_g", name: "문성곤", sport: "농구", team: "수원 KT 소닉붐", position: "스몰 포워드 (SF)", age: 33, height: 196, weight: 85, stats: { speed: 81, power: 80, endurance: 93, agility: 86, flexibility: 80, tactics: 90 }, trends: [85, 88, 90, 89, 91], trendUnit: "리바운드 스내칭" },
+            { id: "bas_jun", name: "전성현", sport: "농구", team: "창원 LG 세이커스", position: "슈팅 가드 (SG)", age: 35, height: 188, weight: 77, stats: { speed: 78, power: 70, endurance: 84, agility: 82, flexibility: 84, tactics: 92 }, trends: [89, 91, 94, 90, 95], trendUnit: "3점 릴리즈 속도" },
+            { id: "bas_lee_s_h", name: "이승현", sport: "농구", team: "부산 KCC 이지스", position: "파워 포워드 (PF)", age: 34, height: 197, weight: 105, stats: { speed: 70, power: 92, endurance: 89, agility: 75, flexibility: 76, tactics: 91 }, trends: [84, 87, 89, 88, 90], trendUnit: "박스아웃 효율" },
+            { id: "bas_lee_j_h", name: "이정현", sport: "농구", team: "고양 소노 스카이거너스", position: "포인트 가드 (PG)", age: 27, height: 187, weight: 85, stats: { speed: 86, power: 79, endurance: 89, agility: 92, flexibility: 85, tactics: 94 }, trends: [85, 88, 91, 93, 95], trendUnit: "경기 어시스트 성공 지표" },
+            { id: "bas_yeo", name: "여준석", sport: "농구", team: "곤자가 대학교", position: "파워 포워드 (PF)", age: 24, height: 203, weight: 98, stats: { speed: 88, power: 91, endurance: 84, agility: 87, flexibility: 82, tactics: 82 }, trends: [74, 78, 83, 86, 89], trendUnit: "버티컬 탄력" },
+            { id: "bas_lee_h_j", name: "이현중", sport: "농구", team: "일라와라 호크스", position: "스몰 포워드 (SF)", age: 26, height: 201, weight: 93, stats: { speed: 82, power: 80, endurance: 86, agility: 83, flexibility: 80, tactics: 89 }, trends: [80, 84, 87, 89, 91], trendUnit: "외곽 오프볼 움직임" },
+            { id: "bas_park_m", name: "박무빈", sport: "농구", team: "울산 현대모비스 피버스", position: "포인트 가드 (PG)", age: 25, height: 187, weight: 82, stats: { speed: 85, power: 74, endurance: 84, agility: 87, flexibility: 81, tactics: 83 }, trends: [72, 76, 79, 83, 86], trendUnit: "공격 돌파 시도" },
+            { id: "bas_yoo_g", name: "유기상", sport: "농구", team: "창원 LG 세이커스", position: "슈팅 가드 (SG)", age: 25, height: 190, weight: 83, stats: { speed: 80, power: 73, endurance: 86, agility: 83, flexibility: 80, tactics: 84 }, trends: [71, 75, 79, 82, 85], trendUnit: "3점슛 메이드 레이트" },
+            { id: "bas_moon_j_h", name: "문정현", sport: "농구", team: "수원 KT 소닉붐", position: "스몰 포워드 (SF)", age: 25, height: 194, weight: 93, stats: { speed: 78, power: 82, endurance: 85, agility: 80, flexibility: 77, tactics: 83 }, trends: [70, 73, 76, 80, 84], trendUnit: "포스트 수비 기여도" },
+            { id: "bas_lee_j", name: "이재도", sport: "농구", team: "고양 소노 스카이거너스", position: "포인트 가드 (PG)", age: 34, height: 180, weight: 77, stats: { speed: 84, power: 72, endurance: 89, agility: 86, flexibility: 81, tactics: 90 }, trends: [82, 84, 86, 88, 89], trendUnit: "2대2 게임 리딩" },
+            { id: "bas_kim_n", name: "김낙현", sport: "농구", team: "대구 한국가스공사 페가수스", position: "포인트 가드 (PG)", age: 31, height: 184, weight: 82, stats: { speed: 83, power: 78, endurance: 84, agility: 85, flexibility: 80, tactics: 87 }, trends: [80, 82, 84, 86, 88], trendUnit: "풀업 점퍼 정밀성" },
+            { id: "bas_lee_k", name: "이관희", sport: "농구", team: "원주 DB 프로미", position: "슈팅 가드 (SG)", age: 38, height: 190, weight: 82, stats: { speed: 82, power: 76, endurance: 86, agility: 83, flexibility: 81, tactics: 84 }, trends: [81, 83, 85, 82, 84], trendUnit: "스틸 성공률" },
+            { id: "bas_yang_h", name: "양홍석", sport: "농구", team: "창원 LG 세이커스", position: "스몰 포워드 (SF)", age: 29, height: 195, weight: 90, stats: { speed: 80, power: 83, endurance: 88, agility: 81, flexibility: 79, tactics: 86 }, trends: [81, 83, 85, 87, 89], trendUnit: "리바운드 가담률" },
+            { id: "bas_ahn_y", name: "안영준", sport: "농구", team: "서울 SK 나이츠", position: "스몰 포워드 (SF)", age: 31, height: 195, weight: 95, stats: { speed: 82, power: 86, endurance: 87, agility: 81, flexibility: 78, tactics: 86 }, trends: [81, 84, 85, 87, 89], trendUnit: "공격 돌파 및 페인트존" },
+            { id: "bas_park_j_h", name: "박지훈", sport: "농구", team: "안양 정관장 레드부스터스", position: "포인트 가드 (PG)", age: 31, height: 184, weight: 80, stats: { speed: 85, power: 73, endurance: 86, agility: 88, flexibility: 83, tactics: 85 }, trends: [80, 82, 84, 85, 87], trendUnit: "속공 전개 빈도" },
+            { id: "bas_jung_s_w", name: "정성우", sport: "농구", team: "안양 정관장 레드부스터스", position: "포인트 가드 (PG)", age: 33, height: 178, weight: 78, stats: { speed: 84, power: 75, endurance: 90, agility: 85, flexibility: 79, tactics: 83 }, trends: [79, 81, 83, 85, 87], trendUnit: "앞선 강한 압박 평점" },
+            { id: "bas_jung_c", name: "정창영", sport: "농구", team: "부산 KCC 이지스", position: "슈팅 가드 (SG)", age: 38, height: 193, weight: 90, stats: { speed: 76, power: 81, endurance: 85, agility: 79, flexibility: 80, tactics: 87 }, trends: [82, 84, 82, 85, 86], trendUnit: "수비 조력율" },
+            { id: "bas_seo_m", name: "서명진", sport: "농구", team: "울산 현대모비스 피버스", position: "포인트 가드 (PG)", age: 27, height: 189, weight: 81, stats: { speed: 81, power: 73, endurance: 84, agility: 83, flexibility: 81, tactics: 82 }, trends: [75, 78, 80, 83, 85], trendUnit: "외곽 지원 득점" },
+            { id: "bas_lee_w", name: "이원석", sport: "농구", team: "서울 삼성 썬더스", position: "센터 (C)", age: 26, height: 206, weight: 95, stats: { speed: 79, power: 85, endurance: 82, agility: 80, flexibility: 74, tactics: 80 }, trends: [71, 75, 78, 80, 83], trendUnit: "스크린 플레이 효율" },
+            { id: "bas_choi_s", name: "최성원", sport: "농구", team: "안양 정관장 레드부스터스", position: "포인트 가드 (PG)", age: 31, height: 184, weight: 79, stats: { speed: 83, power: 72, endurance: 88, agility: 84, flexibility: 80, tactics: 84 }, trends: [78, 81, 83, 85, 87], trendUnit: "외곽 슛 공헌도" },
+            { id: "bas_shin_j", name: "신주영", sport: "농구", team: "대구 한국가스공사 페가수스", position: "센터 (C)", age: 24, height: 200, weight: 94, stats: { speed: 73, power: 84, endurance: 80, agility: 75, flexibility: 72, tactics: 79 }, trends: [66, 70, 73, 77, 81], trendUnit: "골밑 블로킹 공헌" },
+            { id: "bas_cho_c", name: "조창희", sport: "농구", team: "서울 삼성 썬더스", position: "포인트 가드 (PG)", age: 25, height: 181, weight: 76, stats: { speed: 82, power: 68, endurance: 81, agility: 84, flexibility: 79, tactics: 80 }, trends: [68, 72, 75, 78, 81], trendUnit: "패스 정밀성" },
+            { id: "bas_shin_d", name: "신동혁", sport: "농구", team: "서울 삼성 썬더스", position: "슈팅 가드 (SG)", age: 26, height: 191, weight: 85, stats: { speed: 80, power: 76, endurance: 85, agility: 81, flexibility: 79, tactics: 82 }, trends: [71, 75, 77, 80, 83], trendUnit: "대인 방어 스코어" },
+            { id: "bas_yang_j", name: "양재민", sport: "농구", team: "센다이 89ers", position: "스몰 포워드 (SF)", age: 27, height: 201, weight: 95, stats: { speed: 81, power: 84, endurance: 85, agility: 80, flexibility: 77, tactics: 83 }, trends: [75, 79, 81, 84, 86], trendUnit: "오프볼 무브 지표" },
+            { id: "bas_han_h", name: "한호빈", sport: "농구", team: "울산 현대모비스 피버스", position: "포인트 가드 (PG)", age: 35, height: 180, weight: 77, stats: { speed: 75, power: 70, endurance: 82, agility: 80, flexibility: 78, tactics: 87 }, trends: [80, 82, 81, 83, 85], trendUnit: "어시스트 비율" },
+            { id: "bas_choi_c", name: "최창진", sport: "농구", team: "수원 KT 소닉붐", position: "포인트 가드 (PG)", age: 33, height: 185, weight: 82, stats: { speed: 77, power: 75, endurance: 83, agility: 81, flexibility: 79, tactics: 84 }, trends: [78, 80, 82, 81, 83], trendUnit: "공격 흐름 조율" },
+            { id: "bas_kim_g", name: "김국찬", sport: "농구", team: "울산 현대모비스 피버스", position: "스몰 포워드 (SF)", age: 30, height: 190, weight: 88, stats: { speed: 79, power: 78, endurance: 83, agility: 80, flexibility: 76, tactics: 83 }, trends: [76, 79, 81, 82, 84], trendUnit: "외곽 지원력" },
+            { id: "bas_jang_j", name: "장재석", sport: "농구", team: "울산 현대모비스 피버스", position: "센터 (C)", age: 35, height: 203, weight: 100, stats: { speed: 68, power: 90, endurance: 82, agility: 72, flexibility: 73, tactics: 85 }, trends: [81, 83, 81, 84, 83], trendUnit: "공격 리바운드" },
+            { id: "bas_kim_d_l", name: "김동량", sport: "농구", team: "서울 삼성 썬더스", position: "센터 (C)", age: 39, height: 198, weight: 95, stats: { speed: 65, power: 86, endurance: 80, agility: 69, flexibility: 71, tactics: 84 }, trends: [78, 80, 77, 76, 78], trendUnit: "수비 공헌도" },
+            { id: "bas_kim_j_i", name: "김준일", sport: "농구", team: "울산 현대모비스 피버스", position: "센터 (C)", age: 34, height: 200, weight: 104, stats: { speed: 70, power: 91, endurance: 81, agility: 74, flexibility: 73, tactics: 85 }, trends: [81, 83, 80, 79, 81], trendUnit: "하이포스트 득점" },
+            { id: "bas_kim_y_h", name: "김영현", sport: "농구", team: "울산 현대모비스 피버스", position: "슈팅 가드 (SG)", age: 35, height: 186, weight: 81, stats: { speed: 79, power: 76, endurance: 86, agility: 81, flexibility: 78, tactics: 82 }, trends: [77, 79, 81, 82, 80], trendUnit: "블루워커 수비 효율" },
+            { id: "bas_park_i", name: "박인태", sport: "농구", team: "창원 LG 세이커스", position: "센터 (C)", age: 31, height: 200, weight: 94, stats: { speed: 72, power: 85, endurance: 80, agility: 73, flexibility: 71, tactics: 81 }, trends: [76, 78, 80, 81, 82], trendUnit: "인사이드 박스아웃" },
+            { id: "bas_ham", name: "함지훈", sport: "농구", team: "울산 현대모비스 피버스", position: "파워 포워드 (PF)", age: 42, height: 198, weight: 100, stats: { speed: 66, power: 88, endurance: 84, agility: 73, flexibility: 78, tactics: 96 }, trends: [87, 89, 88, 91, 90], trendUnit: "스크린 플레이 효율" },
+            { id: "bas_du", name: "두경민", sport: "농구", team: "창원 LG 세이커스", position: "포인트 가드 (PG)", age: 35, height: 184, weight: 75, stats: { speed: 86, power: 68, endurance: 82, agility: 88, flexibility: 80, tactics: 86 }, trends: [80, 83, 79, 81, 84], trendUnit: "딥쓰리 성공 횟수" },
+            { id: "bas_ragun", name: "라건아", sport: "농구", team: "부산 KCC 이지스", position: "센터 (C)", age: 37, height: 199, weight: 108, stats: { speed: 80, power: 93, endurance: 92, agility: 78, flexibility: 75, tactics: 88 }, trends: [87, 89, 91, 90, 93], trendUnit: "더블더블 달성도" },
+            { id: "bas_han_h_w", name: "한희원", sport: "농구", team: "수원 KT 소닉붐", position: "스몰 포워드 (SF)", age: 33, height: 195, weight: 90, stats: { speed: 81, power: 78, endurance: 86, agility: 82, flexibility: 80, tactics: 83 }, trends: [79, 82, 84, 85, 87], trendUnit: "수비 로테이션" },
+            { id: "bas_shin_m", name: "신민석", sport: "농구", team: "울산 현대모비스 피버스", position: "파워 포워드 (PF)", age: 27, height: 199, weight: 93, stats: { speed: 76, power: 80, endurance: 84, agility: 77, flexibility: 78, tactics: 81 }, trends: [73, 76, 78, 80, 82], trendUnit: "스트레치 4 득점" },
+            { id: "bas_lee_g_h", name: "이근휘", sport: "농구", team: "부산 KCC 이지스", position: "슈팅 가드 (SG)", age: 28, height: 188, weight: 82, stats: { speed: 82, power: 72, endurance: 81, agility: 84, flexibility: 82, tactics: 80 }, trends: [74, 78, 81, 85, 88], trendUnit: "외곽 3점 성공률" },
+            { id: "bas_jung_s_w", name: "정성우", sport: "농구", team: "안양 정관장 레드부스터스", position: "포인트 가드 (PG)", age: 33, height: 178, weight: 78, stats: { speed: 84, power: 75, endurance: 90, agility: 85, flexibility: 79, tactics: 83 }, trends: [79, 81, 83, 85, 87], trendUnit: "앞선 강한 압박 평점" }
+        ];
+
+        // 앱 로드 시 실행될 기본 초기화 함수
+        window.onload = function() {
+            lucide.createIcons();
+            
+            // 데이터 확인 및 바인딩
+            athletes = [...initialKoreanStars];
+            selectedAthleteId = athletes[0]?.id || null;
+
+            handleFilterChange(); // 필터링하여 명단 목록 렌더링
+            if (selectedAthleteId) {
+                loadAthleteToForm(selectedAthleteId);
+            }
+        };
+
+        // 실시간 검색어 및 필터 버튼 통합 처리기
+        function handleFilterChange() {
+            const keyword = document.getElementById("searchKeyword").value.toLowerCase().trim();
+            const listContainer = document.getElementById("athleteListContainer");
+            
+            // 필터링 적용
+            const filteredAthletes = athletes.filter(ath => {
+                const matchesSport = currentSportFilter === 'all' || ath.sport === currentSportFilter;
+                const matchesKeyword = !keyword || 
+                    ath.name.toLowerCase().includes(keyword) || 
+                    ath.team.toLowerCase().includes(keyword) || 
+                    ath.position.toLowerCase().includes(keyword);
+                return matchesSport && matchesKeyword;
+            });
+
+            // 갯수 갱신
+            document.getElementById("filteredCount").innerText = `${filteredAthletes.length}명`;
+            document.getElementById("totalCountBadge").innerText = `로드된 선수: ${athletes.length}명`;
+
+            // 렌더링 시작
+            listContainer.innerHTML = "";
+
+            if (filteredAthletes.length === 0) {
+                listContainer.innerHTML = `
+                    <div class="text-center py-10 border border-dashed border-slate-200 rounded-xl text-slate-400 text-xs">
+                        <i data-lucide="search-code" class="w-8 h-8 mx-auto mb-1 opacity-60"></i>
+                        일치하는 한국 현역 선수가 없습니다.
+                    </div>
+                `;
+                lucide.createIcons();
+                return;
+            }
+
+            filteredAthletes.forEach((ath) => {
+                const isSelected = ath.id === selectedAthleteId;
+                
+                // 종합점수 계산
+                const sum = Object.values(ath.stats).reduce((a, b) => a + b, 0);
+                const avg = (sum / 6).toFixed(1);
+
+                const item = document.createElement("div");
+                item.className = `p-3 rounded-xl border transition-all flex items-center justify-between cursor-pointer ${
+                    isSelected 
+                        ? 'bg-blue-50/70 border-blue-200 ring-2 ring-blue-500/20 shadow-sm' 
+                        : 'bg-slate-50 hover:bg-slate-100 border-slate-200'
+                }`;
+                item.setAttribute("onclick", `selectAthlete('${ath.id}')`);
+
+                const sportColor = ath.sport === '축구' ? 'bg-emerald-100 text-emerald-800' : 'bg-orange-100 text-orange-800';
+
+                item.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-full font-bold text-xs flex items-center justify-center ${
+                            isSelected ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-700'
+                        }">
+                            ${ath.name.substring(0, 2)}
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-1.5">
+                                <span class="font-bold text-sm text-slate-900">${ath.name}</span>
+                                <span class="text-[9px] px-1.5 py-0.5 rounded font-bold ${sportColor}">${ath.sport}</span>
+                            </div>
+                            <div class="text-[11px] text-slate-500 mt-0.5">${ath.team || '팀 미지정'} · ${ath.position || '포지션 미정'}</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="text-right">
+                            <span class="text-[9px] text-slate-400 block leading-tight">종합 능력</span>
+                            <span class="font-extrabold text-xs text-blue-600">${avg}점</span>
+                        </div>
+                    </div>
+                `;
+
+                listContainer.appendChild(item);
+            });
+
+            lucide.createIcons();
+        }
+
+        // 종목 대분류 필터 변경
+        function changeSportFilter(sport) {
+            currentSportFilter = sport;
+            const filters = ['all', 'soccer', 'basketball'];
+            
+            // 디자인 초기화 및 설정
+            filters.forEach(f => {
+                const element = document.getElementById(`filter_${f}`);
+                if (f === 'all' && sport === 'all' || (f === 'soccer' && sport === '축구') || (f === 'basketball' && sport === '농구')) {
+                    element.className = "py-1.5 text-xs font-bold rounded-lg bg-white text-slate-800 shadow-sm transition-all";
+                } else {
+                    element.className = "py-1.5 text-xs font-semibold text-slate-600 rounded-lg hover:text-slate-800 transition-all";
+                }
+            });
+
+            handleFilterChange();
+        }
+
+        // 선수단에서 선수 선택 시 폼 및 대시보드로 데이터 매핑
+        function selectAthlete(id) {
+            selectedAthleteId = id;
+            handleFilterChange();
+            loadAthleteToForm(id);
+        }
+
+        // 특정 선수의 데이터를 프로필 카드 및 수치 바에 채우기
+        function loadAthleteToForm(id) {
+            const ath = athletes.find(a => a.id === id);
+            if (!ath) return;
+
+            // 상세 프로필 텍스트 바인딩
+            document.getElementById("profileNameSport").innerText = `${ath.name} (${ath.sport})`;
+            document.getElementById("profileTeam").innerText = ath.team || "소속 없음";
+            document.getElementById("profilePosition").innerText = ath.position || "미정";
+            document.getElementById("profileSpecs").innerText = `${ath.age}세 / ${ath.height}cm / ${ath.weight}kg`;
+
+            // 능력치 텍스트 라벨 & 가로 바 동적 연동
+            for (let stat in ath.stats) {
+                const val = ath.stats[stat];
+                document.getElementById(`lbl_${stat}`).innerText = val + "점";
+                document.getElementById(`bar_${stat}`).style.width = val + "%";
+            }
+
+            // 대시보드 계산 출력 실행
+            generateAnalysis();
+        }
+
+        // 차트 모드 체인지 토글러
+        function toggleChartMode(mode) {
+            currentChartMode = mode;
+            const btnRadar = document.getElementById("btn_mode_radar");
+            const btnTrend = document.getElementById("btn_mode_trend");
+
+            if (mode === 'radar') {
+                btnRadar.className = "px-3 py-1 text-xs font-bold rounded-md bg-white text-slate-800 shadow-sm transition-all";
+                btnTrend.className = "px-3 py-1 text-xs font-semibold text-slate-600 rounded-md hover:text-slate-800 transition-all";
+            } else {
+                btnTrend.className = "px-3 py-1 text-xs font-bold rounded-md bg-white text-slate-800 shadow-sm transition-all";
+                btnRadar.className = "px-3 py-1 text-xs font-semibold text-slate-600 rounded-md hover:text-slate-800 transition-all";
+            }
+
+            renderAnalyticsChart();
+        }
+
+        // Chart.js 캔버스 리렌더링
+        function renderAnalyticsChart() {
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+
+            const ctx = document.getElementById('analyticsChart').getContext('2d');
+            const ath = athletes.find(a => a.id === selectedAthleteId);
+            if (!ath) return;
+
+            if (currentChartMode === 'radar') {
+                chartInstance = new Chart(ctx, {
+                    type: 'radar',
+                    data: {
+                        labels: ['스피드', '파워/근력', '지구력', '민첩성', '유연성', '기술/전술'],
+                        datasets: [{
+                            label: '선수 종합 역량 지표',
+                            data: [
+                                ath.stats.speed,
+                                ath.stats.power,
+                                ath.stats.endurance,
+                                ath.stats.agility,
+                                ath.stats.flexibility,
+                                ath.stats.tactics
+                            ],
+                            backgroundColor: 'rgba(37, 99, 235, 0.2)',
+                            borderColor: 'rgba(37, 99, 235, 1)',
+                            borderWidth: 2.5,
+                            pointBackgroundColor: 'rgba(29, 78, 216, 1)',
+                            pointBorderColor: '#fff',
+                            pointHoverBackgroundColor: '#fff',
+                            pointHoverBorderColor: 'rgba(29, 78, 216, 1)'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            r: {
+                                angleLines: { display: true, color: '#e2e8f0' },
+                                grid: { color: '#e2e8f0' },
+                                suggestedMin: 0,
+                                suggestedMax: 100,
+                                ticks: {
+                                    stepSize: 20,
+                                    color: '#64748b',
+                                    font: { size: 9 }
+                                },
+                                pointLabels: {
+                                    color: '#334155',
+                                    font: { size: 12, weight: 'bold' }
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: { display: false }
+                        }
+                    }
+                });
+            } else {
+                chartInstance = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: ['1회차', '2회차', '3회차', '4회차', '최근 회차'],
+                        datasets: [{
+                            label: ath.trendUnit || "기여도",
+                            data: ath.trends,
+                            backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                            borderColor: 'rgba(37, 99, 235, 1)',
+                            borderWidth: 3,
+                            fill: true,
+                            tension: 0.3,
+                            pointBackgroundColor: 'rgba(29, 78, 216, 1)',
+                            pointRadius: 5
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                grid: { color: '#f1f5f9' },
+                                ticks: { color: '#64748b', font: { size: 10 } },
+                                suggestedMin: 0,
+                                suggestedMax: 100
+                            },
+                            x: {
+                                grid: { display: false },
+                                ticks: { color: '#64748b', font: { size: 11, weight: 'bold' } }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'top',
+                                labels: { font: { size: 11, weight: 'bold' }, color: '#334155' }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        // 전체적인 선수의 스펙을 연산하여 우측 대시보드 요약카드 및 보고서 생성
+        function generateAnalysis() {
+            const ath = athletes.find(a => a.id === selectedAthleteId);
+            if (!ath) return;
+
+            // 우측 가상 카드 필드 동기화
+            document.getElementById("out_name").innerText = ath.name;
+            document.getElementById("out_position").innerText = ath.position || "포지션 미지정";
+            document.getElementById("out_team_spec").innerText = `${ath.team} · ${ath.sport}`;
+            document.getElementById("out_age").innerText = ath.age;
+            document.getElementById("out_height").innerText = ath.height;
+            document.getElementById("out_weight").innerText = ath.weight;
+
+            const stats = [
+                { name: '스피드', val: ath.stats.speed },
+                { name: '파워/근력', val: ath.stats.power },
+                { name: '지구력', val: ath.stats.endurance },
+                { name: '민첩성', val: ath.stats.agility },
+                { name: '유연성', val: ath.stats.flexibility },
+                { name: '기술/전술', val: ath.stats.tactics }
+            ];
+
+            // 종합 능력점수 환산
+            const overall = (stats.reduce((acc, curr) => acc + curr.val, 0) / stats.length).toFixed(1);
+            document.getElementById("out_overall_score").innerText = overall;
+
+            // 최고 강점과 취약점 계산 및 바인딩
+            const sortedStats = [...stats].sort((a, b) => b.val - a.val);
+            const topStat = sortedStats[0];
+            const lowestStat = sortedStats[sortedStats.length - 1];
+
+            let strengthText = "";
+            let weaknessText = "";
+
+            if (topStat.val >= 85) {
+                strengthText = `가장 강력한 강점은 [${topStat.name}](으)로 ${topStat.val}점의 압도적 클래스를 증명합니다. 해당 종목 내 최정상급 영향력을 자아내며, 경기 지연을 차단하고 득점 찬스를 만듭니다.`;
+            } else {
+                strengthText = `현재 지표상 가장 높은 역량은 [${topStat.name}](${topStat.val}점)입니다. 선수의 전술 포지셔닝에 큰 기반이 되고 있습니다.`;
+            }
+
+            if (lowestStat.val <= 70) {
+                weaknessText = `조정 및 보완이 권장되는 부분은 [${lowestStat.name}](${lowestStat.val}점) 지표입니다. 근손상 방지 및 피지컬 다운 에이징 밸런싱 세션 구성이 권장됩니다.`;
+            } else {
+                weaknessText = `상대적으로 낮은 편인 [${lowestStat.name}](${lowestStat.val}점) 조차 기본기가 탄탄하여 매우 우수한 토탈 올라운더 성향을 보이고 있습니다.`;
+            }
+
+            document.getElementById("out_strength").innerText = strengthText;
+            document.getElementById("out_weakness").innerText = weaknessText;
+
+            // 데이터 리포트 요약 텍스트
+            const trends = ath.trends;
+            const isTrendImproving = trends[4] > trends[0];
+            const trendDiff = Math.abs(trends[4] - trends[0]).toFixed(1);
+            let trendAssessment = "";
+
+            if (isTrendImproving) {
+                trendAssessment = `최근 기량 추이를 분석한 결과, 기여 지표 점수가 초기 대비 ${trendDiff}점가량 고르게 향상되는 최고의 페이스를 이어가는 중입니다.`;
+            } else if (trends[4] < trends[0]) {
+                trendAssessment = `최근 기복이나 체력 누수 등의 시그널로 인해 후반부 점수가 ${trendDiff}점가량 연성 하강하여, 체계적인 컨디션 세이브 스케줄이 권유됩니다.`;
+            } else {
+                trendAssessment = `지난 5경기 간의 기조가 완벽한 평행선을 이루어, 어떠한 환경이나 상대 전술 조건에서도 평정심을 잃지 않는 베테랑 선수의 견고함을 드러냅니다.`;
+            }
+
+            let mainReport = `대한민국 스포츠 역사에 족적을 남긴 ${ath.name} 선수의 전술적 평균 지수는 ${overall}점입니다. ${ath.sport} 필드에서 이 선수가 가지는 영향력은 최우수 무기인 [${topStat.name}]에서 유래하며, 부족함 없는 다이나믹 플레이의 도약을 위해선 약점인 [${lowestStat.name}] 능력을 훈련 프로그램 전반에 보조적으로 수혈해 나가는 것이 완성도 제고에 유리합니다. ${trendAssessment}`;
+            
+            document.getElementById("out_analysis_report").innerText = mainReport;
+
+            // 렌더링 리로드
+            renderAnalyticsChart();
+        }
+    </script>
+</body>
+</html>
